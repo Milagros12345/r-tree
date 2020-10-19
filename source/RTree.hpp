@@ -1,5 +1,3 @@
-// Copyright
-
 #ifndef SOURCE_RTREE_HPP_
 #define SOURCE_RTREE_HPP_
 
@@ -37,6 +35,9 @@ class RTree {
     bool is_leaf();
 
     std::shared_ptr<Node> insert(const SpatialObject &new_entry);
+    void pickSeeds(std::vector<SpatialObject>&Set_entries, size_t &a,size_t &b);//primero y segundo
+    void pickNext(std::vector<SpatialObject>& Set_entries, size_t* id,const Rectangle<N>&group1,const Rectangle<N>&group2);
+    std::shared_ptr<Node> insert(const SpatialObject& new_entry);
 
     SpatialObject entry[M];
     size_t size = 0;
@@ -70,6 +71,7 @@ class RTree {
 
   // private:
   std::shared_ptr<Node> root_pointer_;
+  size_t cont_entries;
 };
 
 /** Node R-tree struct implementation details*/
@@ -136,26 +138,67 @@ RTree<N, ElemType, M, m>::RTree() : root_pointer_(new Node) {}
 
 // TODO(ADE):
 template <size_t N, typename ElemType, size_t M, size_t m>
-RTree<N, ElemType, M, m>::~RTree() {}
+RTree<N, ElemType, M, m>::~RTree() {root_pointer_.reset();}
 
 // TODO(ADE):
 template <size_t N, typename ElemType, size_t M, size_t m>
 size_t RTree<N, ElemType, M, m>::dimension() const {
-  return size_t(0);
+  return N;
 }
 
 // TODO(ADE):
 template <size_t N, typename ElemType, size_t M, size_t m>
 size_t RTree<N, ElemType, M, m>::size() const {
-  return size_t(0);
+  return cont_entries;
 }
 
 // TODO(ADE):
 template <size_t N, typename ElemType, size_t M, size_t m>
 bool RTree<N, ElemType, M, m>::empty() const {
-  return false;
+  return !cont_entries;
 }
+template <size_t N, typename ElemType, size_t M, size_t m>
+void RTree<N, ElemType, M, m>::Node::pickSeeds(
+                std::vector<SpatialObject>&Set_entries, size_t &a, size_t &b) {
+  a=0;b=1;
+  Rectangle<N> enlargement_box=Set_entries[a].box;
+  enlargement_box.adjust(Set_entries[b].box);
+  float areaP,area_max=enlargement_box.get_area();
+  area_max-=(Set_entries[a].box.get_area()+Set_entries[b].box.get_area());
+  for (size_t i = 0; i < M; ++i) {
+    for (size_t j = i + 1; j < M + 1; ++j) {
+      enlargement_box = Set_entries[i].box;
+      enlargement_box.adjust(Set_entries[j].box);
+      areaP = enlargement_box.get_area() - Set_entries[i].box.get_area() -Set_entries[j].box.get_area();
+      if (areaP > area_max) {
+        area_max=areaP;
+        a=i;b=j;
+      }
+    }
+  }
+}
+template <size_t N, typename ElemType, size_t M, size_t m>
+void RTree<N, ElemType, M, m>::Node::pickNext(std::vector<SpatialObject>& Set_entries, size_t* id,const Rectangle<N>&group1, const Rectangle<N>&group2) {
+  float max_d=-1.0;
+  Rectangle<N> enlar_g1, enlar_g2;
+  float area_g1, area_g2, area_P;
+  for (size_t i = 0; i < Set_entries.size(); ++i) {
+    enlar_g1 = group1;
+    enlar_g1.adjust(Set_entries[i].box);
+    area_g1 = enlar_g1.get_area() - group1.get_area();
 
+    enlar_g2 = group2;
+    enlar_g2.adjust(Set_entries[i].box);
+    area_g2 = enlar_g2.get_area() - group2.get_area();
+
+    area_P = std::abs(area_g1 - area_g2);
+
+    if (area_P > max_d) {
+      max_d = area_P;
+      *id = i;
+    }
+  }
+}
 template <size_t N, typename ElemType, size_t M, size_t m>
 void RTree<N, ElemType, M, m>::insert(const Rectangle<N> &box,
                                       const ElemType &value) {
@@ -166,6 +209,7 @@ void RTree<N, ElemType, M, m>::insert(const Rectangle<N> &box,
   // TODO(ADE): Last part of insert is missing i.e. when the root overflow
   // see R-tree gutman paper description.
 }
+
 
 template <size_t N, typename ElemType, size_t M, size_t m>
 std::shared_ptr<typename RTree<N, ElemType, M, m>::Node>
